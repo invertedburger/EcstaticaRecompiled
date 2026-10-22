@@ -32948,6 +32948,7 @@ void FUN_00442ca4(void)
   case 0x4d:
     break;
   case 0x4e:
+    break;
   }
   FUN_004600e9();
   FUN_004600e9();
@@ -48240,6 +48241,7 @@ void __fastcall FUN_00456874(undefined4 param_1,int param_2)
       FUN_00455850(iVar1,iVar1);
       iVar1 = extraout_ECX;
 switchD_004568b6_default:
+      ;
     } while ((in_EAX / 10 != 0) && (iVar1 = iVar1 + -10, in_EAX = in_EAX / 10, unaff_EBX <= iVar1));
   }
   return;
@@ -49226,6 +49228,7 @@ undefined4 FUN_00458714(void)
   local_3c.lpfnWndProc = (WNDPROC)E2R_WndProc;
   local_3c.cbClsExtra = 0;
   local_3c.cbWndExtra = 0;
+  local_3c.hInstance = in_EAX;
   local_3c.hIcon = LoadIconA(in_EAX,(LPCSTR)0x7f00);
   _DAT_00ac4da8 = LoadCursorA((HINSTANCE)0x0,(LPCSTR)0x7f00);
   local_3c.hCursor = _DAT_00ac4da8;
@@ -49387,6 +49390,9 @@ void __fastcall FUN_00458bec(undefined4 param_1,undefined4 param_2)
   undefined4 extraout_ECX;
   undefined8 uVar2;
   
+  if (in_EAX == 0) {
+    return;
+  }
   piVar1 = *(int **)(in_EAX + 0x38);
   if (piVar1 != (int *)0x0) {
     uVar2 = (**(code **)(*piVar1 + 0x48))(piVar1,param_2,param_1);
@@ -58109,6 +58115,7 @@ LAB_00462415:
       local_18 = pbVar1;
     }
 LAB_0046258c:
+    ;
   } while ((*(byte *)(in_EAX + 0x10) & 2) == 0);
   if ((*local_18 == 0x25) && (pcVar4 = (char *)FUN_004625ec(puVar5,in_EAX), *pcVar4 == 'n')) {
     FUN_004628d8(extraout_ECX_09,unaff_EBX);
@@ -58840,6 +58847,7 @@ LAB_00462ef9:
         iVar5 = (int)uVar10;
         iVar6 = extraout_ECX_04;
 LAB_00462eae:
+        ;
       } while (iVar5 != -1);
     }
   }
@@ -59453,7 +59461,14 @@ void FUN_00463d1c(void)
   byte bVar1;
   char *pcVar2;
   char *pcVar3;
+  uintptr_t imageBase;
+  uintptr_t imageLimit;
   
+  /* These two symbols are separate globals, not a packed init table, and the
+     4-byte values stored in them are original image addresses. Only call a
+     pointer that actually lands in this module. */
+  imageBase = (uintptr_t)GetModuleHandleA((LPCSTR)0x0);
+  imageLimit = imageBase + 0x01000000;
   while( true ) {
     pcVar2 = &DAT_0047d8b4;
     bVar1 = in_AL;
@@ -59465,7 +59480,10 @@ void FUN_00463d1c(void)
     }
     if (pcVar2 == &DAT_0047d8b4) break;
     if (*(code **)(pcVar2 + 2) != (code *)0x0) {
-      (**(code **)(pcVar2 + 2))();
+      uintptr_t fn = (uintptr_t)*(code **)(pcVar2 + 2);
+      if (fn >= imageBase && fn < imageLimit) {
+        (**(code **)(pcVar2 + 2))();
+      }
     }
     *pcVar2 = '\x02';
   }

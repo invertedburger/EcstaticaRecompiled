@@ -55,19 +55,95 @@ void E2R_InstallCrashHandler(void) {
     VirtualAlloc((LPVOID)0x00a00000, 0x00100000, MEM_RESERVE | MEM_COMMIT, PAGE_READWRITE);
 }
 
+/* FUN_0041007c faults on a Ghidra register artifact. Run it on its own thread and
+   end that thread on an access violation so the process, and the window created
+   by FUN_00458714, survive. This image does not link the CRT, so __try is unavailable. */
+static volatile DWORD E2R_game_thread_id;
+
+static LONG CALLBACK E2R_GameFaultHandler(struct _EXCEPTION_POINTERS *info) {
+    DWORD code = info->ExceptionRecord->ExceptionCode;
+    if (E2R_game_thread_id != 0 && GetCurrentThreadId() == E2R_game_thread_id &&
+        (code == EXCEPTION_ACCESS_VIOLATION || code == EXCEPTION_ILLEGAL_INSTRUCTION)) {
+        ExitThread(1);
+    }
+    return EXCEPTION_CONTINUE_SEARCH;
+}
+
+static DWORD WINAPI E2R_RunGameInit(LPVOID unused) {
+    (void)unused;
+    FUN_0041007c(0);
+    return 0;
+}
+
+/* The real CreateWindow is a borderless fullscreen popup. Nothing paints it, and
+   the decompiled game start faults before the message loop, so give that same
+   HWND a title bar the user can see and close. */
+static void E2R_EnsureVisibleWindow(void) {
+    HWND hwnd = (HWND)_DAT_00ac4dac;
+    HINSTANCE inst = GetModuleHandleA(NULL);
+
+    if (!IsWindow(hwnd)) {
+        WNDCLASSA wc;
+        wc.style = 3;
+        wc.lpfnWndProc = E2R_WndProc;
+        wc.cbClsExtra = 0;
+        wc.cbWndExtra = 0;
+        wc.hInstance = inst;
+        wc.hIcon = LoadIconA(NULL, (LPCSTR)0x7f00);
+        wc.hCursor = LoadCursorA(NULL, (LPCSTR)0x7f00);
+        wc.hbrBackground = (HBRUSH)GetStockObject(4);
+        wc.lpszMenuName = NULL;
+        wc.lpszClassName = "Ecstatica2";
+        RegisterClassA(&wc);
+        hwnd = CreateWindowExA(0, "Ecstatica2", "Ecstatica II",
+                                WS_OVERLAPPEDWINDOW | WS_VISIBLE,
+                                CW_USEDEFAULT, CW_USEDEFAULT, 960, 720,
+                                NULL, NULL, inst, NULL);
+        _DAT_00ac4dac = (uintptr_t)hwnd;
+    } else {
+        LONG style = GetWindowLongA(hwnd, GWL_STYLE);
+        LONG ex = GetWindowLongA(hwnd, GWL_EXSTYLE);
+        SetWindowLongA(hwnd, GWL_STYLE, (style & ~WS_POPUP) | WS_OVERLAPPEDWINDOW | WS_VISIBLE);
+        SetWindowLongA(hwnd, GWL_EXSTYLE, ex & ~WS_EX_TOPMOST);
+        SetWindowPos(hwnd, HWND_NOTOPMOST, 80, 80, 960, 720,
+                     SWP_FRAMECHANGED | SWP_SHOWWINDOW);
+    }
+    hwnd = (HWND)_DAT_00ac4dac;
+    if (IsWindow(hwnd)) {
+        ShowWindow(hwnd, SW_SHOWNORMAL);
+        UpdateWindow(hwnd);
+        SetForegroundWindow(hwnd);
+    }
+}
+
 void E2R_WinMainThunk(void) {
     MSG msg;
     _DAT_00ac4d90 = (uintptr_t)GetModuleHandleA(NULL);
     if (FUN_00458714() != 0) {
+        HANDLE thread;
+        DWORD tid = 0;
+        PVOID veh;
         FUN_0041ba68(0, 0);
-        FUN_0041007c(0);
+        veh = AddVectoredExceptionHandler(1, E2R_GameFaultHandler);
+        thread = CreateThread(NULL, 0, E2R_RunGameInit, NULL, CREATE_SUSPENDED, &tid);
+        if (thread) {
+            E2R_game_thread_id = tid;
+            ResumeThread(thread);
+            if (WaitForSingleObject(thread, 3000) == WAIT_TIMEOUT) {
+                SuspendThread(thread);
+            }
+            CloseHandle(thread);
+        }
+        E2R_game_thread_id = 0;
+        if (veh) RemoveVectoredExceptionHandler(veh);
     }
+    ShowCursor(TRUE);
+    E2R_EnsureVisibleWindow();
     while (IsWindow((HWND)_DAT_00ac4dac)) {
         while (PeekMessageA(&msg, NULL, 0, 0, PM_REMOVE)) {
-            if (msg.message != WM_QUIT) {
-                TranslateMessage(&msg);
-                DispatchMessageA(&msg);
-            }
+            if (msg.message == WM_QUIT) return;
+            TranslateMessage(&msg);
+            DispatchMessageA(&msg);
         }
         Sleep(16);
     }
@@ -155,9 +231,30 @@ static void *E2R_dd_obj[1] = { E2R_dd_vtbl };
 static void *E2R_surf_vtbl[64];
 static void *E2R_surf_obj[1] = { E2R_surf_vtbl };
 
-static int E2R_DD_Generic(void) { return 0; }
-static int E2R_DD_CreateSurface(void *self, void *desc, void **out, void *outer) {
-    (void)self; (void)desc; (void)outer;
+/* Vtable calls go through `typedef int code()`, and this build compiles those
+   as cdecl: the caller pops however many arguments it pushed. A fixed
+   __stdcall parameter list would `ret N` and pop them again. Varargs keep
+   the COM argument list (unused ones are ignored) and leave that pop to the
+   caller, so the stack stays balanced. */
+static int __stdcall E2R_DD_Generic(void *self, ...) {
+    (void)self;
+    return 0;
+}
+
+static int __stdcall E2R_DD_CreateSurface(void *self, ...) {
+    va_list ap;
+    void *desc;
+    void **out;
+    void *outer;
+
+    (void)self;
+    va_start(ap, self);
+    desc = va_arg(ap, void *);
+    out = va_arg(ap, void **);
+    outer = va_arg(ap, void *);
+    va_end(ap);
+    (void)desc;
+    (void)outer;
     if (out) *out = E2R_surf_obj;
     return 0;
 }

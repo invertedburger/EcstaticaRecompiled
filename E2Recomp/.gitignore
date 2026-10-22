@@ -7,3 +7,10 @@ reconstructed/smoke-run/
 # Compiler intermediates
 reconstructed/*.o
 reconstructed/*.obj
+
+# Crash / trace logs from a local run
+reconstructed/E2Recomp_rebuilt_crash.log
+reconstructed/E2Recomp_rebuilt_trace.log
+
+# Upstream 1.0_Staging zip and extracted prebuilts (not this reconstruction)
+upstream-staging/
