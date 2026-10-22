@@ -61,8 +61,20 @@ function Build-Mingw([string]$gcc) {
         & $gcc -c -w -std=gnu11 -I"$root" -I"$srcRoot" "$root\$unit.c" -o "$root\$unit.o"
         if ($LASTEXITCODE -ne 0) { throw "gcc failed on $unit.c" }
     }
-    $objs = $units | ForEach-Object { "$root\$_.o" }
-    & $gcc -o $out @objs -nostartfiles -Wl,--subsystem,windows -Wl,-e,_entry -Wl,--image-base,0x10000000 -luser32 -lgdi32 -lkernel32 -lwinmm -lcomdlg32 -ldsound -lddraw -lmsacm32
+    $objs = @($units | ForEach-Object { "$root\$_.o" })
+    # Pass flags as an argument array. A bare -Wl,--subsystem,windows is a
+    # PowerShell parameter list (the comma), not a gcc argument.
+    $linkArgs = @(
+        "-o", $out
+    ) + $objs + @(
+        "-nostartfiles",
+        "-Wl,--subsystem,windows",
+        "-Wl,-e,_entry",
+        "-Wl,--image-base,0x10000000",
+        "-luser32", "-lgdi32", "-lkernel32", "-lwinmm",
+        "-lcomdlg32", "-ldsound", "-lddraw", "-lmsacm32"
+    )
+    & $gcc @linkArgs
     if ($LASTEXITCODE -ne 0) { throw "gcc link failed" }
 }
 
