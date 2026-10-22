@@ -57,7 +57,16 @@ Equivalent direct Ghidra command:
 
 ## Rebuild Status
 
-The reconstruction now compiles and links with MSVC x86 via `reconstructed/Build-Reconstructed.ps1`.
+The reconstruction compiles and links to a 32-bit Windows executable.
+
+On Windows, from this repo:
+
+```powershell
+.\E2Recomp\reconstructed\Build-Reconstructed.ps1
+.\E2Recomp\reconstructed\E2Recomp_rebuilt.exe
+```
+
+If Visual Studio is not installed, that script downloads a portable MinGW GCC into `E2Recomp/.tools` (not committed). On Ubuntu 24.04 the same exe can be cross-built with `reconstructed/build.sh`, which downloads MinGW the same way when `i686-w64-mingw32-gcc` is not already on `PATH`. The executable itself runs on Windows and uses only standard OS DLLs.
 
 This is still not a clean original-source rebuild. Native PE decompilation recovers control flow and expressions, but not original headers, structs, source file layout, local names, comments, or exact runtime imports.
 

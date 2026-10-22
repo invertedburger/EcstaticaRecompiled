@@ -1,0 +1,9 @@
+# Toolchain fetched by build.sh / Build-Reconstructed.ps1 (MinGW GCC)
+.tools/
+
+# Local smoke leftovers
+reconstructed/smoke-run/
+
+# Compiler intermediates
+reconstructed/*.o
+reconstructed/*.obj

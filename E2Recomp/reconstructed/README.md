@@ -1,25 +1,45 @@
 # Reconstructed Build
 
-This folder contains the current compileable reconstruction of `E2Recomp.exe`.
+Compileable reconstruction of `E2Recomp.exe` (32-bit Windows PE). This is a rebuildable scaffold, not a behavior-complete port.
 
 ## Files
 
-- `E2Recomp_recon.c`: normalized Ghidra decompilation.
-- `E2Recomp_recon.h`: recovered prototypes, global declarations, Win32 aliases, and decompiler helper macros.
-- `E2Recomp_globals.c`: recovered global/data-label definitions.
-- `E2Recomp_stubs.c`: isolated stubs for unresolved hardware, x87, SIMD, and decompiler helper symbols.
-- `E2Recomp_names.tsv`: first-pass function rename map from string/import heuristics.
-- `Build-Reconstructed.ps1`: reproducible 32-bit MSVC build.
-- `E2Recomp_rebuilt.exe`: linked reconstructed executable.
+- `E2Recomp_recon.c` / `E2Recomp_recon.h`: normalized Ghidra decompilation and declarations
+- `E2Recomp_globals.c` / `E2Recomp_data_init.c`: recovered globals and data init
+- `E2Recomp_stubs.c`: stubs for unresolved hardware / x87 / SIMD / helper symbols
+- `Build-Reconstructed.ps1`: Windows build. MSVC x86 if Visual Studio is installed, otherwise a portable MinGW downloaded into `../.tools`
+- `build.sh`: Linux cross-build of the same Windows exe. Uses `i686-w64-mingw32-gcc` if present, otherwise downloads MinGW into `../.tools`
+- `E2Recomp_rebuilt.exe`: linked 32-bit Windows executable
 
-## Build
+## Build and run (Windows)
 
-From `C:\ecstatica2`:
+No project dependencies to install. If `cl.exe` is not available, the script downloads MinGW (about 200MB) into `E2Recomp/.tools`, which is gitignored.
 
 ```powershell
-.\reverse\E2Recomp\reconstructed\Build-Reconstructed.ps1
+cd E2Recomp\reconstructed
+.\Build-Reconstructed.ps1
+.\E2Recomp_rebuilt.exe
 ```
+
+The exe links only standard Windows libraries (`kernel32`, `user32`, `gdi32`, `winmm`, `comdlg32`). DirectDraw / DirectSound calls in this scaffold are stubbed in `E2Recomp_stubs.c`.
+
+To force a specific Visual Studio environment:
+
+```powershell
+.\Build-Reconstructed.ps1 -VcVars32 "C:\Path\To\vcvars32.bat"
+```
+
+## Cross-build (Linux)
+
+Produces the same Windows exe. Does not run the game.
+
+```bash
+cd E2Recomp/reconstructed
+./build.sh
+```
+
+Copy `E2Recomp_rebuilt.exe` to Windows and launch it. The portable compiler downloaded by `build.sh` is the Ubuntu 24.04 MinGW package set. On other distros, install `gcc-mingw-w64-i686` and re-run; the script uses that compiler instead.
 
 ## Status
 
-The project now compiles and links with MSVC x86. The result is a rebuildable reconstruction scaffold, not a behavior-complete port. The stubs in `E2Recomp_stubs.c` must be replaced with real implementations or import-library bindings before runtime behavior can be expected to match the original executable.
+Links with MSVC x86 or MinGW i686. Stubs in `E2Recomp_stubs.c` must be replaced before runtime can match the original executable. Launching the current exe is expected to hit the crash logger in `E2Recomp_stubs.c` until those stubs are real.
