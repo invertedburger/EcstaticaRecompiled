@@ -1,4 +1,5 @@
-# Toolchain fetched by build.sh / Build-Reconstructed.ps1 (MinGW GCC)
+# Toolchains fetched by build.sh / run.sh / Build-Reconstructed.ps1
+# (MinGW GCC, Wine, WinLibs, download caches)
 .tools/
 
 # Local smoke leftovers
